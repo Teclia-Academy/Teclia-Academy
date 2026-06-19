@@ -11,7 +11,7 @@ Follow these steps to run both frontend and backend locally.
 1. Open a terminal and navigate to the backend folder:
 
 ```bash
-cd Backend
+cd Backendd
 ```
 
 2. Install backend dependencies:
