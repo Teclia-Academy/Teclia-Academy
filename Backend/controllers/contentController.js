@@ -1,17 +1,7 @@
-import jwt from 'jsonwebtoken';
 import { getDb, saveDatabase } from '../db/init.js';
 import { canAccessPlan, PLAN_TIERS } from '../utils/plans.js';
+import { parseOptionalToken } from '../utils/authHelper.js';
 import storage from '../storage/index.js';
-
-const parseOptionalUser = (req) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return null;
-  try {
-    return jwt.verify(token, process.env.JWT_SECRET);
-  } catch {
-    return null;
-  }
-};
 
 const getUserAccess = async (userId) => {
   const db = getDb();
@@ -65,8 +55,8 @@ export const getContent = async (req, res) => {
     `);
 
     const allContent = mapContentRows(result);
-    const tokenUser = parseOptionalUser(req);
-    const access = tokenUser ? await getUserAccess(tokenUser.id) : null;
+    const tokenUser = parseOptionalToken(req);
+    const access = tokenUser ? await getUserAccess(tokenUser.id ?? tokenUser.userId) : null;
     let content = filterContentForUser(allContent, access);
     content = await resolveContentRows(content);
 
@@ -93,8 +83,8 @@ export const getContentById = async (req, res) => {
     }
 
     let content = mapContentRows(result)[0];
-    const tokenUser = parseOptionalUser(req);
-    const access = tokenUser ? await getUserAccess(tokenUser.id) : null;
+    const tokenUser = parseOptionalToken(req);
+    const access = tokenUser ? await getUserAccess(tokenUser.id ?? tokenUser.userId) : null;
 
     if (!filterContentForUser([content], access).length) {
       return res.status(403).json({ error: 'No tienes acceso a este contenido con tu plan actual' });

@@ -37,7 +37,7 @@ const removeFileFromStorageOrLocal = async (fileUrl) => {
 };
 
 const generateToken = (userId, role) => {
-  return jwt.sign({ id: userId, role }, process.env.JWT_SECRET, {
+  return jwt.sign({ userId, role }, process.env.JWT_SECRET, {
     expiresIn: '24h'
   });
 };

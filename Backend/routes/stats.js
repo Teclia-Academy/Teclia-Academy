@@ -1,6 +1,7 @@
 import express from 'express';
 import { recordVisit, getVisitStats } from '../controllers/statsController.js';
-import { verifyToken, adminOnly } from '../middleware/auth.js';
+import { verifyToken } from '../middleware/verifyToken.js';
+import { adminOnly } from '../middleware/adminOnly.js';
 
 const router = express.Router();
 

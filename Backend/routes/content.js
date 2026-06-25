@@ -1,7 +1,8 @@
 import express from 'express';
 import multer from 'multer';
 import { getContent, getContentById, uploadContent, deleteContent, getFreeContent } from '../controllers/contentController.js';
-import { verifyToken, adminOnly } from '../middleware/auth.js';
+import { verifyToken } from '../middleware/verifyToken.js';
+import { adminOnly } from '../middleware/adminOnly.js';
 
 const upload = multer({ storage: multer.memoryStorage() });
 

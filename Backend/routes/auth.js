@@ -14,7 +14,8 @@ import {
   deleteStudent,
   listStudents,
 } from '../controllers/authController.js';
-import { verifyToken, adminOnly } from '../middleware/auth.js';
+import { verifyToken } from '../middleware/verifyToken.js';
+import { adminOnly } from '../middleware/adminOnly.js';
 
 const router = express.Router();
 
