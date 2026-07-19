@@ -8,17 +8,19 @@ datasource db {
 }
 
 model User {
-  id                Int       @id @default(autoincrement())
-  email             String    @unique
-  passwordHash      String    @map("password_hash")
+  id                Int           @id @default(autoincrement())
+  email             String        @unique
+  passwordHash      String        @map("password_hash")
   name              String
-  role              String?   @default("student")
-  avatarUrl         String?   @map("avatar_url")
-  resetPin          String?   @map("reset_pin")
-  resetPinExpiresAt DateTime? @map("reset_pin_expires_at")
-  planTier          String?   @map("plan_tier")
-  createdAt         DateTime? @default(now()) @map("created_at")
+  role              String?       @default("student")
+  avatarUrl         String?       @map("avatar_url")
+  resetPin          String?       @map("reset_pin")
+  resetPinExpiresAt DateTime?     @map("reset_pin_expires_at")
+  planTier          String?       @map("plan_tier")
+  createdAt         DateTime?     @default(now()) @map("created_at")
   content           Content[]
+  subscription      Subscription?
+  paymentEvents     PaymentEvent[]
 
   @@map("users")
 }
@@ -36,6 +38,37 @@ model Content {
   uploader    User      @relation(fields: [uploadedBy], references: [id])
 
   @@map("content")
+}
+
+model Subscription {
+  id                  Int       @id @default(autoincrement())
+  stripeId            String?   @unique @map("stripe_id")
+  status              String?   @default("active")
+  planTier            String?   @map("plan_tier")
+  currentPeriodEnd    DateTime? @map("current_period_end")
+  cancelAtPeriodEnd   Boolean?  @default(false) @map("cancel_at_period_end")
+  userId              Int       @unique @map("user_id")
+  createdAt           DateTime? @default(now()) @map("created_at")
+  updatedAt           DateTime? @updatedAt @map("updated_at")
+  user                User      @relation(fields: [userId], references: [id])
+
+  @@map("subscriptions")
+}
+
+model PaymentEvent {
+  id            Int       @id @default(autoincrement())
+  externalId    String    @unique @map("external_id")
+  eventType     String    @map("event_type")
+  status        String    @default("received")
+  payload       String?   @map("payload")
+  processedAt   DateTime? @map("processed_at")
+  createdAt     DateTime? @default(now()) @map("created_at")
+  userId        Int?      @map("user_id")
+  errorMessage  String?   @map("error_message")
+  attemptCount  Int       @default(1) @map("attempt_count")
+  user          User?     @relation(fields: [userId], references: [id])
+
+  @@map("payment_events")
 }
 
 model SiteStat {

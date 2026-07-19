@@ -7,6 +7,7 @@ import { connectDb } from './db/init.js';
 import authRoutes from './routes/auth.js';
 import contentRoutes from './routes/content.js';
 import statsRoutes from './routes/stats.js';
+import paymentRoutes from './routes/payments.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,6 +35,7 @@ if (process.env.LOCAL_UPLOADS === 'true') {
 app.use('/api/auth', authRoutes);
 app.use('/api/content', contentRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

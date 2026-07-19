@@ -1,10 +1,24 @@
 import prisma from '../utils/prismaClient.js';
 
-const resolveDatabaseUrl = () => {
-  if (process.env.NODE_ENV === 'test' && process.env.TEST_DATABASE_URL) {
-    return process.env.TEST_DATABASE_URL;
+const normalizeDatabaseUrl = (databaseUrl) => {
+  if (typeof databaseUrl !== 'string') {
+    return databaseUrl;
   }
-  return process.env.DATABASE_URL;
+
+  const trimmed = databaseUrl.trim();
+  if (trimmed.startsWith('sqlite:')) {
+    return `file:${trimmed.slice('sqlite:'.length)}`;
+  }
+
+  return trimmed;
+};
+
+const resolveDatabaseUrl = () => {
+  const fromEnv = process.env.NODE_ENV === 'test' && process.env.TEST_DATABASE_URL
+    ? process.env.TEST_DATABASE_URL
+    : process.env.DATABASE_URL;
+
+  return normalizeDatabaseUrl(fromEnv);
 };
 
 export const connectDb = async () => {
@@ -17,7 +31,9 @@ export const connectDb = async () => {
   }
 
   if (process.env.NODE_ENV === 'test' && process.env.TEST_DATABASE_URL) {
-    process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
+    process.env.DATABASE_URL = normalizeDatabaseUrl(process.env.TEST_DATABASE_URL);
+  } else if (process.env.DATABASE_URL) {
+    process.env.DATABASE_URL = normalizeDatabaseUrl(process.env.DATABASE_URL);
   }
 
   await prisma.$connect();

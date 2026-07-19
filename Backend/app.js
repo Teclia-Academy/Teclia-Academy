@@ -8,6 +8,7 @@ import { globalLimiter } from './middleware/rateLimiter.js';
 import authRoutes from './routes/auth.js';
 import contentRoutes from './routes/content.js';
 import statsRoutes from './routes/stats.js';
+import paymentRoutes from './routes/payments.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,6 +25,7 @@ if (!process.env.JWT_SECRET) {
 }
 
 app.use(cors());
+app.use('/api/payments', paymentRoutes);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
