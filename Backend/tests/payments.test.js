@@ -264,4 +264,36 @@ describe('Stripe webhook sync', () => {
     expect(auditEvents[0].status).toBe('processed');
     expect(auditEvents[0].payload).toContain('evt_audit_only');
   });
+
+  it('accepts a signed webhook end to end and updates the user state and audit trail', async () => {
+    const user = await createUser('final@example.com');
+    const payload = {
+      id: 'evt_full_flow',
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          id: 'cs_full_flow',
+          customer_details: { email: user.email },
+          metadata: { plan_tier: 'master' },
+        },
+      },
+    };
+
+    const { body, headers } = createSignedRequest(payload, 'checkout.session.completed');
+    const res = await request(app)
+      .post('/api/payments/webhook')
+      .set(headers)
+      .send(body);
+
+    expect(res.status).toBe(200);
+    const updatedUser = await prisma.user.findUnique({ where: { id: user.id } });
+    expect(updatedUser.planTier).toBe('master');
+    expect(updatedUser.role).toBe('premium');
+    const subscriptionRecord = await prisma.subscription.findUnique({ where: { userId: user.id } });
+    expect(subscriptionRecord).not.toBeNull();
+    expect(subscriptionRecord.status).toBe('active');
+    const auditRecord = await prisma.paymentEvent.findUnique({ where: { externalId: 'evt_full_flow' } });
+    expect(auditRecord).not.toBeNull();
+    expect(auditRecord.status).toBe('processed');
+  });
 });
