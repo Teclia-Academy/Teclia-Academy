@@ -16,7 +16,9 @@ const normalizeDatabaseUrl = (databaseUrl) => {
 
 // Use TEST_DATABASE_URL for tests, otherwise use DATABASE_URL or default
 const databaseUrl = normalizeDatabaseUrl(
-  process.env.TEST_DATABASE_URL || process.env.DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:5432/postgres'
+  (process.env.NODE_ENV === 'test' && process.env.TEST_DATABASE_URL)
+    ? process.env.TEST_DATABASE_URL
+    : (process.env.DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:5432/postgres')
 );
 
 export default defineConfig({

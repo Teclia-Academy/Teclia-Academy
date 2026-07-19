@@ -23,6 +23,9 @@ if (!process.env.JWT_SECRET) {
 
 // Middleware
 app.use(cors());
+
+// Mount webhook routes before the global JSON parser so Stripe can read the raw body.
+app.use('/api/payments', paymentRoutes);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -35,7 +38,6 @@ if (process.env.LOCAL_UPLOADS === 'true') {
 app.use('/api/auth', authRoutes);
 app.use('/api/content', contentRoutes);
 app.use('/api/stats', statsRoutes);
-app.use('/api/payments', paymentRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

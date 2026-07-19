@@ -14,6 +14,23 @@ const findUserByEmail = async (email) => {
   return prisma.user.findFirst({ where: { email: { equals: String(email).trim().toLowerCase() } } });
 };
 
+const createAuditEvent = async ({ event, eventType, status = 'ignored', userId = null, attemptCount = 1 }) => {
+  const existing = await prisma.paymentEvent.findUnique({ where: { externalId: event.id } });
+  if (existing) return existing;
+
+  return prisma.paymentEvent.create({
+    data: {
+      externalId: event.id,
+      eventType,
+      payload: JSON.stringify(event),
+      status,
+      processedAt: new Date(),
+      userId,
+      attemptCount,
+    },
+  });
+};
+
 const updateUserSubscriptionState = async ({ userId, planTier, role, subscriptionData, event, eventType }) => {
   const normalizedPlan = normalizePlan(planTier);
   const normalizedRole = buildRole(normalizedPlan);
@@ -77,14 +94,17 @@ const handleCheckoutCompleted = async (event) => {
   const email = session?.customer_details?.email || session?.customer_email || null;
   const planTier = session?.metadata?.plan_tier || session?.metadata?.planTier || null;
   const user = await findUserByEmail(email);
-  if (!user) return { statusCode: 200, body: { received: true, ignored: true } };
+  if (!user) {
+    await createAuditEvent({ event, eventType: event.type, status: 'ignored' });
+    return { statusCode: 200, body: { received: true, ignored: true } };
+  }
 
   await updateUserSubscriptionState({
     userId: user.id,
     planTier,
     role: buildRole(normalizePlan(planTier)),
     subscriptionData: {
-      stripeId: session.id,
+      stripeId: session.subscription || null,
       status: 'active',
       planTier: normalizePlan(planTier),
       currentPeriodEnd: null,
@@ -102,7 +122,10 @@ const handleInvoicePaid = async (event) => {
   const email = invoice?.customer_email || invoice?.customer?.email || null;
   const planTier = invoice?.metadata?.plan_tier || invoice?.metadata?.planTier || null;
   const user = await findUserByEmail(email);
-  if (!user) return { statusCode: 200, body: { received: true, ignored: true } };
+  if (!user) {
+    await createAuditEvent({ event, eventType: event.type, status: 'ignored' });
+    return { statusCode: 200, body: { received: true, ignored: true } };
+  }
 
   await updateUserSubscriptionState({
     userId: user.id,
@@ -126,7 +149,10 @@ const handleInvoicePaymentFailed = async (event) => {
   const invoice = event.data?.object || {};
   const email = invoice?.customer_email || invoice?.customer?.email || null;
   const user = await findUserByEmail(email);
-  if (!user) return { statusCode: 200, body: { received: true, ignored: true } };
+  if (!user) {
+    await createAuditEvent({ event, eventType: event.type, status: 'ignored' });
+    return { statusCode: 200, body: { received: true, ignored: true } };
+  }
 
   await updateUserSubscriptionState({
     userId: user.id,
@@ -151,7 +177,10 @@ const handleSubscriptionUpdated = async (event) => {
   const email = subscription?.customer_email || subscription?.customer?.email || null;
   const planTier = subscription?.items?.data?.[0]?.price?.metadata?.plan_tier || subscription?.items?.data?.[0]?.price?.metadata?.planTier || null;
   const user = await findUserByEmail(email);
-  if (!user) return { statusCode: 200, body: { received: true, ignored: true } };
+  if (!user) {
+    await createAuditEvent({ event, eventType: event.type, status: 'ignored' });
+    return { statusCode: 200, body: { received: true, ignored: true } };
+  }
 
   await updateUserSubscriptionState({
     userId: user.id,
@@ -175,7 +204,10 @@ const handleSubscriptionDeleted = async (event) => {
   const subscription = event.data?.object || {};
   const email = subscription?.customer_email || subscription?.customer?.email || null;
   const user = await findUserByEmail(email);
-  if (!user) return { statusCode: 200, body: { received: true, ignored: true } };
+  if (!user) {
+    await createAuditEvent({ event, eventType: event.type, status: 'ignored' });
+    return { statusCode: 200, body: { received: true, ignored: true } };
+  }
 
   await updateUserSubscriptionState({
     userId: user.id,
