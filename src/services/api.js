@@ -2,8 +2,19 @@ import axios from 'axios';
 import { getRequestSignal, invokeLogout } from '../utils/authSession.js';
 import { getCsrfToken, getStoredToken, generateCsrfToken } from '../utils/jwt.js';
 
-export const BACKEND_BASE_URL = 'https://teclia-academia-2.onrender.com';
-const API_BASE_URL = `${BACKEND_BASE_URL}/api`;
+const resolveApiBase = () => {
+  const configured = import.meta.env.VITE_API_BASE_URL?.trim();
+  if (configured) {
+    return configured.replace(/\/$/, '');
+  }
+  if (import.meta.env.PROD) {
+    return '/api';
+  }
+  return 'http://localhost:3001/api';
+};
+
+export const BACKEND_BASE_URL = resolveApiBase().replace(/\/api$/, '') || '';
+const API_BASE_URL = resolveApiBase();
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -109,6 +120,11 @@ export const contentService = {
     api.get(`/content/${id}`),
   getFreeContent: () =>
     api.get('/content/free'),
+};
+
+export const paymentsService = {
+  submitPaymentMethod: (paymentMethodId, { idempotencyKey, planTier } = {}) =>
+    api.post('/payments/payment-method', { paymentMethodId, planTier, idempotencyKey }, { headers: { ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}) } }),
 };
 
 export default api;

@@ -21,6 +21,7 @@ model User {
   content           Content[]
   subscription      Subscription?
   paymentEvents     PaymentEvent[]
+  payments          Payment[]
 
   @@map("users")
 }
@@ -76,4 +77,40 @@ model SiteStat {
   value Int    @default(0)
 
   @@map("site_stats")
+}
+
+model Payment {
+  id                    Int      @id @default(autoincrement())
+  userId                Int      @map("user_id")
+  amount                Int
+  currency              String   @default("usd")
+  planTier              String   @map("plan_tier")
+  paymentMethodId       String?  @map("payment_method_id")
+  stripePaymentIntentId String?  @unique @map("stripe_payment_intent_id")
+  idempotencyKey        String   @unique @map("idempotency_key")
+  status                String   @default("pending")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+  events PaymentMethodEvent[]
+
+  @@map("payments")
+}
+
+model PaymentMethodEvent {
+  id             Int      @id @default(autoincrement())
+  stripeEventId  String   @unique @map("stripe_event_id")
+  paymentId      Int?     @map("payment_id")
+  idempotencyKey String?  @map("idempotency_key")
+  eventType      String   @map("event_type")
+  payload        String
+  outcome        String   @map("outcome")
+  processedAt    DateTime? @map("processed_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  payment Payment? @relation(fields: [paymentId], references: [id])
+
+  @@unique([idempotencyKey, eventType])
+  @@map("payment_method_events")
 }

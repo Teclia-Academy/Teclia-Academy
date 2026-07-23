@@ -8,7 +8,8 @@ import { globalLimiter } from './middleware/rateLimiter.js';
 import authRoutes from './routes/auth.js';
 import contentRoutes from './routes/content.js';
 import statsRoutes from './routes/stats.js';
-import paymentRoutes from './routes/payments.js';
+import paymentsRoutes from './routes/payments.js';
+import webhooksRoutes from './routes/webhooks.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,7 +26,10 @@ if (!process.env.JWT_SECRET) {
 }
 
 app.use(cors());
-app.use('/api/payments', paymentRoutes);
+app.use('/api/webhooks', express.raw({ type: 'application/json' }), webhooksRoutes);
+// Stripe needs the exact raw bytes of this route to verify the signature, so it must
+// be parsed as raw before the global JSON parser below runs.
+app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -37,6 +41,7 @@ if (process.env.LOCAL_UPLOADS === 'true') {
 app.use('/api/auth', authRoutes);
 app.use('/api/content', contentRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/payments', paymentsRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'Teclia Backend is running' });

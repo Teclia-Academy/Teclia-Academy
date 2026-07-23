@@ -1,12 +1,20 @@
 import Stripe from 'stripe';
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('STRIPE_SECRET_KEY is required');
-}
+let stripe;
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2024-06-20',
-});
+const getStripeClient = () => {
+  if (!stripe) {
+    if (!process.env.STRIPE_SECRET_KEY) {
+      const error = new Error('STRIPE_SECRET_KEY is required');
+      error.statusCode = 500;
+      throw error;
+    }
+    stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2024-06-20',
+    });
+  }
+  return stripe;
+};
 
 export const verifyStripeSignature = ({ signature, payload, rawBody }) => {
   if (!signature) {
@@ -25,7 +33,7 @@ export const verifyStripeSignature = ({ signature, payload, rawBody }) => {
   const body = Buffer.isBuffer(payload) ? payload.toString('utf8') : String(payload || rawBody || '');
 
   try {
-    return stripe.webhooks.constructEvent(body, signature, webhookSecret);
+    return getStripeClient().webhooks.constructEvent(body, signature, webhookSecret);
   } catch (error) {
     error.statusCode = 400;
     throw error;

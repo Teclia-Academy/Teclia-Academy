@@ -7,6 +7,13 @@ export default defineConfig({
   preview: {
     host: '0.0.0.0',
     port: process.env.PORT || 4173,
-    allowedHosts: ['teclia-academia-1.onrender.com']
-  }
+  },
+  server: {
+    proxy: {
+      '/api': {
+        target: process.env.VITE_DEV_API_PROXY || 'http://localhost:3001',
+        changeOrigin: true,
+      },
+    },
+  },
 })
