@@ -267,7 +267,6 @@ export const confirmPayment = async (paymentId) => {
   }
   return updated;
 import https from 'https';
-import Stripe from 'stripe';
 import prisma from '../utils/prismaClient.js';
 import { PLAN_TIERS, normalizePlanTier } from '../utils/plans.js';
 import {
@@ -434,40 +433,6 @@ export class StripeCheckoutRequestError extends PaymentServiceError {
 }
 
 const getStripeSecret = () => process.env.STRIPE_SECRET_KEY || '';
-
-let cachedStripeClient = null;
-let cachedStripeClientKey = null;
-
-/**
- * Lazily construct a Stripe SDK client. Used only for local/offline operations
- * (webhook signature construction) — the rest of this module talks to Stripe
- * over raw HTTPS via `stripeRequest`. A placeholder key is used when
- * STRIPE_SECRET_KEY is not configured (e.g. tests), since signature
- * verification does not make network calls.
- */
-export const getStripeClient = () => {
-  const key = getStripeSecret() || 'sk_test_placeholder_key_for_signature_verification';
-  if (!cachedStripeClient || cachedStripeClientKey !== key) {
-    cachedStripeClient = new Stripe(key);
-    cachedStripeClientKey = key;
-  }
-  return cachedStripeClient;
-};
-
-/**
- * Verify a Stripe webhook request and return the parsed event.
- * Throws Stripe.errors.StripeSignatureVerificationError on invalid/missing signature.
- */
-export function constructStripeEvent(rawBody, signatureHeader) {
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!webhookSecret) {
-    throw new PaymentServiceError('Missing STRIPE_WEBHOOK_SECRET', {
-      statusCode: 500,
-      clientMessage: 'Webhook not configured',
-    });
-  }
-  return getStripeClient().webhooks.constructEvent(rawBody, signatureHeader, webhookSecret);
-}
 
 const resolvePlanTierForPriceId = (priceId) => {
   if (!priceId) return null;
@@ -2345,8 +2310,6 @@ export default {
   createOrReusePayment,
   createCheckoutSession,
   markPaymentProcessed,
-  getStripeClient,
-  constructStripeEvent,
   processStripeWebhookEvent,
   processPaymentIntentWebhookEvent,
   activateOneTimePaymentEntitlement,
