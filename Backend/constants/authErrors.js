@@ -20,3 +20,8 @@ export const REFRESH_TOKEN_EXPIRED = 'REFRESH_TOKEN_EXPIRED';
 export const REFRESH_TOKEN_EXPIRED_MESSAGE = 'Refresh token expired.';
 export const INVALID_REFRESH_TOKEN = 'INVALID_REFRESH_TOKEN';
 export const INVALID_REFRESH_TOKEN_MESSAGE = 'Invalid refresh token.';
+export const REFRESH_TOKEN_REUSE = 'REFRESH_TOKEN_REUSE';
+export const REFRESH_TOKEN_REUSE_MESSAGE =
+  'Refresh token reuse detected. All sessions in this family have been revoked. Please log in again.';
+export const REFRESH_TOKEN_REVOKED = 'REFRESH_TOKEN_REVOKED';
+export const REFRESH_TOKEN_REVOKED_MESSAGE = 'Refresh token has been revoked. Please log in again.';

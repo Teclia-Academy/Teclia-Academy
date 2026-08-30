@@ -9,10 +9,18 @@ import { setUserPlanTier } from "../services/entitlementService.js";
 import storage from "../storage/index.js";
 import { recordAdminAction } from "../services/adminAuditService.js";
 import {
+  issueRefreshToken,
+  rotateRefreshToken,
+  revokeTokenFamily,
+  revokeAllForUser,
+} from "../services/refreshTokenService.js";
+import {
   REFRESH_TOKEN_EXPIRED,
   REFRESH_TOKEN_EXPIRED_MESSAGE,
   INVALID_REFRESH_TOKEN,
   INVALID_REFRESH_TOKEN_MESSAGE,
+  REFRESH_TOKEN_REUSE,
+  REFRESH_TOKEN_REUSE_MESSAGE,
   USER_NOT_FOUND,
   USER_NOT_FOUND_MESSAGE,
 } from "../constants/authErrors.js";
@@ -61,14 +69,6 @@ const generateToken = (userId, role, planTier = null) => {
   if (planTier) payload.planTier = planTier;
   return jwt.sign(payload, process.env.JWT_SECRET, {
     expiresIn: "24h",
-  });
-};
-
-const generateRefreshToken = (userId, role, planTier = null) => {
-  const payload = { id: userId, role };
-  if (planTier) payload.planTier = planTier;
-  return jwt.sign(payload, process.env.JWT_SECRET, {
-    expiresIn: "7d",
   });
 };
 
@@ -142,8 +142,8 @@ export const signup = async (req, res) => {
     });
 
     const token = generateToken(user.id, user.role, user.planTier);
-    const refreshToken = generateRefreshToken(user.id, user.role, user.planTier);
-    
+    const { token: refreshToken } = await issueRefreshToken({ user, req });
+
     res.status(201).json({
       message: "User created successfully",
       token,
@@ -183,8 +183,8 @@ export const login = async (req, res) => {
     }
 
     const token = generateToken(user.id, user.role, user.planTier);
-    const refreshToken = generateRefreshToken(user.id, user.role, user.planTier);
-    
+    const { token: refreshToken } = await issueRefreshToken({ user, req });
+
     res.status(200).json({
       message: "Login successful",
       token,
@@ -389,47 +389,75 @@ export const resetPassword = async (req, res) => {
 export const refresh = async (req, res) => {
   try {
     const { refreshToken } = req.body;
-    
+
     if (!refreshToken) {
       return res.status(400).json({ error: "Refresh token is required" });
     }
 
+    // 1) Cheap structural checks: verify signature/expiry and the refresh
+    //    discriminator before touching the database. This also rejects access
+    //    tokens presented at the refresh endpoint.
     let decoded;
     try {
-      decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+      decoded = jwt.verify(refreshToken, process.env.JWT_SECRET, {
+        algorithms: ["HS256"],
+      });
     } catch (err) {
-      if (err.name === 'TokenExpiredError') {
-        return res.status(401).json({ 
-          error: REFRESH_TOKEN_EXPIRED_MESSAGE, 
+      if (err.name === "TokenExpiredError") {
+        return res.status(401).json({
+          error: REFRESH_TOKEN_EXPIRED_MESSAGE,
           code: REFRESH_TOKEN_EXPIRED,
         });
       }
-      if (err.name === 'JsonWebTokenError') {
-        return res.status(401).json({ 
-          error: INVALID_REFRESH_TOKEN_MESSAGE, 
-          code: INVALID_REFRESH_TOKEN,
+      return res.status(401).json({
+        error: INVALID_REFRESH_TOKEN_MESSAGE,
+        code: INVALID_REFRESH_TOKEN,
+      });
+    }
+
+    if (decoded.typ !== "refresh") {
+      return res.status(401).json({
+        error: INVALID_REFRESH_TOKEN_MESSAGE,
+        code: INVALID_REFRESH_TOKEN,
+      });
+    }
+
+    // 2) Database is the source of truth for rotation / reuse / revocation.
+    const result = await rotateRefreshToken({ presentedToken: refreshToken, req });
+
+    switch (result.status) {
+      case "rotated": {
+        const { user } = result;
+        const token = generateToken(user.id, user.role, user.planTier);
+        return res.status(200).json({
+          message: "Token refreshed successfully",
+          token,
+          refreshToken: result.refreshToken,
         });
       }
-      return res.status(401).json({ error: INVALID_REFRESH_TOKEN_MESSAGE, code: INVALID_REFRESH_TOKEN });
+      case "reuse":
+        // Stolen/replayed token: the whole family has been revoked. Force re-login.
+        return res.status(401).json({
+          error: REFRESH_TOKEN_REUSE_MESSAGE,
+          code: REFRESH_TOKEN_REUSE,
+        });
+      case "expired":
+        return res.status(401).json({
+          error: REFRESH_TOKEN_EXPIRED_MESSAGE,
+          code: REFRESH_TOKEN_EXPIRED,
+        });
+      case "user_not_found":
+        return res.status(401).json({
+          error: USER_NOT_FOUND_MESSAGE,
+          code: USER_NOT_FOUND,
+        });
+      case "invalid":
+      default:
+        return res.status(401).json({
+          error: INVALID_REFRESH_TOKEN_MESSAGE,
+          code: INVALID_REFRESH_TOKEN,
+        });
     }
-
-    // Verify user still exists
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
-    });
-
-    if (!user) {
-      return res.status(401).json({ error: USER_NOT_FOUND_MESSAGE, code: USER_NOT_FOUND });
-    }
-
-    const token = generateToken(user.id, user.role, user.planTier);
-    const newRefreshToken = generateRefreshToken(user.id, user.role, user.planTier);
-    
-    res.status(200).json({ 
-      message: "Token refreshed successfully",
-      token, 
-      refreshToken: newRefreshToken 
-    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -437,9 +465,28 @@ export const refresh = async (req, res) => {
 
 export const logout = async (req, res) => {
   try {
-    // Optional: Add logout timestamp to user record for audit purposes
-    res.status(200).json({ 
-      message: "Logout successful" 
+    // Durably revoke the presented refresh token's entire family so the
+    // rotation chain (and any concurrent tabs on this device) cannot mint
+    // further tokens. Logout stays 200 even when no refresh token is supplied
+    // (stateless callers / access-token-only clients).
+    const { refreshToken } = req.body || {};
+    if (refreshToken) {
+      await revokeTokenFamily(refreshToken);
+    }
+    res.status(200).json({
+      message: "Logout successful",
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+export const logoutAll = async (req, res) => {
+  try {
+    const revoked = await revokeAllForUser(req.user.id);
+    res.status(200).json({
+      message: "Logged out of all sessions",
+      revoked,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

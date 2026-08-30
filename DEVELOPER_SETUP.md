@@ -201,6 +201,14 @@ If you prefer to use Supabase for storage and/or Postgres hosting:
 - If you need to run SQL scripts manually, examples are in `Backend/postgres_setup.sql` and `Backend/sqlite_setup.sql`.
 - There is a `npm run migrate:postgres` script in `Backend/package.json` intended for migration helpers; inspect the script before running.
 
+### Refresh tokens (`refresh_tokens` table)
+
+- Refresh-token rotation is backed by the `refresh_tokens` table (Prisma model `RefreshToken`). It is created by the Prisma migration `20260830000000_add_refresh_tokens` and is also bootstrapped idempotently on startup by `Backend/db/init.js`, so a fresh SQLite or Postgres database needs no manual step.
+- To sync a local dev/test database with the current schema without a full migration run: `cd Backend && npx prisma db push`. Then regenerate the client with `npx prisma generate` (also run automatically on `postinstall`).
+- Only the **SHA-256 hash** of each refresh token is stored (`token_hash`, unique). Plaintext refresh tokens are never written to the database or logs.
+- The rotation/reuse behavior is fully covered by `Backend/tests/auth.test.js`. Run just that suite with `npm test -- tests/auth.test.js` from `Backend/`.
+- Refresh tokens live for 7 days (`REFRESH_TOKEN_TTL_DAYS` in `Backend/services/refreshTokenService.js`); access tokens remain 24h. Both are signed with `JWT_SECRET`, so set a strong secret.
+
 ## 10) Common setup errors and fixes
 
 - "MEDIA_SIGNING_SECRET must be defined" — Set a long random server-side secret when `LOCAL_UPLOADS=true`. Rotating it invalidates previously issued local media URLs.

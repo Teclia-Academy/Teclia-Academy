@@ -46,7 +46,8 @@ Routes are grouped below. All examples assume the base URL prefix `/api`.
 ```json
 {
   "message": "User created successfully",
-  "token": "<jwt>",
+  "token": "<access-jwt>",
+  "refreshToken": "<refresh-jwt>",
   "user": { "id": 5, "email": "student@example.com", "name": "Student Name", "role": "student", "plan_tier": null, "entitlement_epoch": 0, "avatar_url": null }
 }
 ```
@@ -68,10 +69,50 @@ Routes are grouped below. All examples assume the base URL prefix `/api`.
 ```json
 {
   "message": "Login successful",
-  "token": "<jwt>",
+  "token": "<access-jwt>",
+  "refreshToken": "<refresh-jwt>",
   "user": { "id": 5, "email": "student@example.com", "name": "Student Name", "role": "student", "plan_tier": null, "entitlement_epoch": 0, "avatar_url": null }
 }
 ```
+
+- POST /api/auth/refresh
+  - Description: Exchange a valid refresh token for a **new access + refresh pair** (OAuth2-style rotation). The presented refresh token is invalidated on success — the response returns its replacement.
+  - Auth required: No (the refresh token itself is the credential; send it in the body)
+  - Body: `{ "refreshToken": "<refresh-jwt>" }`
+  - Response example (200):
+
+```json
+{
+  "message": "Token refreshed successfully",
+  "token": "<new-access-jwt>",
+  "refreshToken": "<new-refresh-jwt>"
+}
+```
+
+  - Error responses (401):
+    - `REFRESH_TOKEN_REUSE` — the token was already rotated (or belongs to a revoked family). **The entire token family is revoked** and the user must log in again. This is the stolen-token defense.
+    - `REFRESH_TOKEN_EXPIRED` — token past its 7-day expiry.
+    - `INVALID_REFRESH_TOKEN` — unknown, malformed, tampered, or an access token presented at this endpoint.
+    - `USER_NOT_FOUND` — the owning account no longer exists.
+
+- POST /api/auth/logout
+  - Description: Durably revoke the presented refresh token's entire family server-side. Idempotent; returns 200 even without a token (stateless callers).
+  - Auth required: No (optional Bearer accepted)
+  - Body: `{ "refreshToken": "<refresh-jwt>" }` (optional)
+  - Response (200): `{ "message": "Logout successful" }`
+
+- POST /api/auth/logout-all
+  - Description: Revoke **every** refresh-token family for the authenticated user across all devices/sessions.
+  - Auth required: Yes (Bearer access token)
+  - Response (200): `{ "message": "Logged out of all sessions", "revoked": 3 }`
+
+#### Refresh token rotation & family reuse detection
+
+- Each login/signup starts a **token family** (`familyId`). Every refresh rotates the current token: the presented token is marked `rotatedAt` and a fresh sibling in the same family is issued (a rotation chain).
+- Only the **SHA-256 hash** of each refresh token is stored server-side (table `refresh_tokens`). Plaintext is never persisted or logged.
+- **Reuse detection:** presenting an already-rotated (or revoked) token revokes the whole family and forces re-login (`REFRESH_TOKEN_REUSE`). This neutralizes a stolen refresh token the moment the legitimate user rotates once.
+- **Concurrency:** rotation is claimed atomically, so concurrent refreshes of the same token yield at most one winner (no split-brain token minting). The web client additionally performs **single-flight** refresh — parallel 401s share one `/auth/refresh` call and retry — so legitimate multi-tab usage never trips reuse detection.
+- Refresh tokens carry a `typ: "refresh"` claim and are rejected by the access-token verifier, so a refresh token can never be used as an access token (and vice-versa).
 
 - GET /api/auth/me
   - Description: Retrieve current user's profile.

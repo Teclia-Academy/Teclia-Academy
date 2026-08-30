@@ -47,7 +47,44 @@ export const connectDb = async () => {
   } catch (_) {
     // ignore for Postgres or already exists
   }
+
+  await ensureRefreshTokensTable(databaseUrl);
+
   console.log('✓ Database connected via Prisma');
+};
+
+// Idempotently ensure the refresh_tokens table exists so refresh-token rotation
+// works on a fresh database without a migration run (mirrors the payments/audit
+// bootstrap used elsewhere). Safe for concurrent callers.
+const ensureRefreshTokensTable = async (databaseUrl = '') => {
+  const isPostgres =
+    databaseUrl.startsWith('postgres://') || databaseUrl.startsWith('postgresql://');
+  const timestampType = isPostgres ? 'TIMESTAMP' : 'DATETIME';
+  try {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "refresh_tokens" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "user_id" INTEGER NOT NULL,
+        "family_id" TEXT NOT NULL,
+        "token_hash" TEXT NOT NULL,
+        "device_label" TEXT,
+        "user_agent_hash" TEXT,
+        "ip_hash" TEXT,
+        "expires_at" ${timestampType} NOT NULL,
+        "rotated_at" ${timestampType},
+        "revoked_at" ${timestampType},
+        "created_at" ${timestampType} NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await prisma.$executeRawUnsafe(
+      `CREATE UNIQUE INDEX IF NOT EXISTS "refresh_tokens_token_hash_key" ON "refresh_tokens"("token_hash")`
+    );
+    await prisma.$executeRawUnsafe(
+      `CREATE INDEX IF NOT EXISTS "refresh_tokens_user_id_family_id_idx" ON "refresh_tokens"("user_id", "family_id")`
+    );
+  } catch (_) {
+    // ignore if it already exists / provider mismatch
+  }
 };
 
 export const initDb = connectDb;

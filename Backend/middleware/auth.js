@@ -53,6 +53,11 @@ export const verifyToken = (req, res, next) => {
     return formatAuthError(res, 401, UNAUTHORIZED_MESSAGE, UNAUTHORIZED);
   }
 
+  // Refresh tokens carry `typ: 'refresh'` and must never authorize a request.
+  if (decoded.typ === 'refresh') {
+    return formatAuthError(res, 401, TOKEN_INVALID_MESSAGE, TOKEN_INVALID);
+  }
+
   const payloadKeys = Object.keys(decoded);
   const hasId = payloadKeys.includes('id');
   const hasUserId = payloadKeys.includes('userId');
@@ -113,6 +118,11 @@ export const optionalAuth = (req, res, next) => {
       return formatAuthError(res, 401, TOKEN_INVALID_MESSAGE, TOKEN_INVALID);
     }
     return formatAuthError(res, 401, UNAUTHORIZED_MESSAGE, UNAUTHORIZED);
+  }
+
+  // Refresh tokens carry `typ: 'refresh'` and must never authorize a request.
+  if (decoded.typ === 'refresh') {
+    return formatAuthError(res, 401, TOKEN_INVALID_MESSAGE, TOKEN_INVALID);
   }
 
   const payloadKeys = Object.keys(decoded);
