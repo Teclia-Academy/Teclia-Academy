@@ -1,4 +1,5 @@
 const TOKEN_KEY = 'authToken_enc';
+const REFRESH_TOKEN_KEY = 'refreshToken_enc';
 
 const obfuscate = (str) => {
   if (!str) return '';
@@ -23,8 +24,22 @@ export const setStoredToken = (token) => {
   localStorage.setItem(TOKEN_KEY, obfuscate(token));
 };
 
+export const getStoredRefreshToken = () => {
+  const enc = localStorage.getItem(REFRESH_TOKEN_KEY);
+  return deobfuscate(enc);
+};
+
+export const setStoredRefreshToken = (token) => {
+  if (!token) {
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    return;
+  }
+  localStorage.setItem(REFRESH_TOKEN_KEY, obfuscate(token));
+};
+
 export const clearStoredToken = () => {
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
   sessionStorage.removeItem('csrf_token');
 };
 

@@ -4,6 +4,7 @@ import {
   signup,
   login,
   logout,
+  logoutAll,
   refresh,
   getMe,
   updateProfile,
@@ -39,6 +40,7 @@ router.post('/signup', authLimiter, validate(authSchemas.register), signup);
 router.post('/login', authLimiter, validate(authSchemas.login), login);
 router.post('/refresh', authLimiter, validate(authSchemas.refresh), refresh);
 router.post('/logout', logout);
+router.post('/logout-all', verifyToken, logoutAll);
 router.get('/me', verifyToken, getMe);
 router.patch('/profile', verifyToken, upload.single('avatar'), updateProfile);
 router.post('/change-password', verifyToken, changePassword);

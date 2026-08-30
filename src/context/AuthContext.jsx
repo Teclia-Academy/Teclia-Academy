@@ -5,7 +5,7 @@ import {
   registerLogoutHandler,
   registerSessionExpiredToastHandler,
 } from '../utils/authSession.js';
-import { clearStoredToken, getStoredToken, isTokenExpired, setStoredToken, generateCsrfToken } from '../utils/jwt.js';
+import { clearStoredToken, getStoredToken, isTokenExpired, setStoredToken, setStoredRefreshToken, generateCsrfToken } from '../utils/jwt.js';
 import { getStoredAvatar, storeAvatar } from '../utils/avatar.js';
 
 const AuthContext = createContext();
@@ -37,15 +37,36 @@ export const AuthProvider = ({ children, onSessionExpiredToast }) => {
 
     if (typeof window !== 'undefined' && redirectTo) {
       const params = new URLSearchParams();
-      if (reason === 'expired') params.set('reason', 'expired');
+      // Surface both plain expiry and security-driven reuse resets to the login page.
+      if (reason === 'expired' || reason === 'reuse') params.set('reason', reason);
       const query = params.toString();
       window.location.href = query ? `${redirectTo}?${query}` : redirectTo;
     }
   }, []);
 
   const logout = useCallback(
-    ({ reason = null, redirectTo = '/auth/login' } = {}) => {
+    async ({ reason = null, redirectTo = '/auth/login' } = {}) => {
+      // Best-effort durable server-side revocation of this device's token family
+      // before we tear down the local session. Never block logout on a failure.
+      try {
+        await authService.logout();
+      } catch (_e) {
+        // ignore network/errors — local session is cleared regardless
+      }
       clearSession({ reason, redirectTo });
+    },
+    [clearSession],
+  );
+
+  const logoutAll = useCallback(
+    async ({ redirectTo = '/auth/login' } = {}) => {
+      // Revoke every refresh-token family for this user (all devices/sessions).
+      try {
+        await authService.logoutAll();
+      } catch (_e) {
+        // ignore — local session is cleared regardless
+      }
+      clearSession({ reason: null, redirectTo });
     },
     [clearSession],
   );
@@ -126,6 +147,7 @@ export const AuthProvider = ({ children, onSessionExpiredToast }) => {
       const normalizedEmail = email.trim().toLowerCase();
       const res = await authService.login(normalizedEmail, password);
       setStoredToken(res.data.token);
+      setStoredRefreshToken(res.data.refreshToken);
       generateCsrfToken();
       localStorage.setItem('lastLoginEmail', normalizedEmail);
       const enriched = enrichUser(res.data.user);
@@ -149,6 +171,7 @@ export const AuthProvider = ({ children, onSessionExpiredToast }) => {
       const normalizedEmail = email.trim().toLowerCase();
       const res = await authService.signup(normalizedEmail, password, name);
       setStoredToken(res.data.token);
+      setStoredRefreshToken(res.data.refreshToken);
       generateCsrfToken();
       localStorage.setItem('lastLoginEmail', normalizedEmail);
       const enriched = enrichUser(res.data.user);
@@ -195,6 +218,7 @@ export const AuthProvider = ({ children, onSessionExpiredToast }) => {
         signup,
         updateProfile,
         logout,
+        logoutAll,
         clearSession,
         refreshSession,
         entitlementEpoch,

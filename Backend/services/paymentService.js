@@ -266,8 +266,9 @@ export const confirmPayment = async (paymentId) => {
     });
   }
   return updated;
+};
+
 import https from 'https';
-import prisma from '../utils/prismaClient.js';
 import { PLAN_TIERS, normalizePlanTier } from '../utils/plans.js';
 import {
   PAYMENT_STATUSES,
@@ -278,12 +279,6 @@ import {
 import { setUserPlanTier } from './entitlementService.js';
 
 const STRIPE_API_BASE = 'api.stripe.com';
-
-const PLAN_AMOUNTS = {
-  [PLAN_TIERS.BASICO]: 999,
-  [PLAN_TIERS.PRO]: 2499,
-  [PLAN_TIERS.MASTER]: 4999,
-};
 
 const PAID_PLAN_TIERS = new Set([
   PLAN_TIERS.BASICO,
@@ -586,6 +581,7 @@ export async function createPaymentIntent(
     paymentMethodId = null,
     stripePaymentIntentId = null,
     stripeCheckoutSessionId = null,
+    ipHash = null,
     tx,
   } = {},
   { db = prisma } = {}

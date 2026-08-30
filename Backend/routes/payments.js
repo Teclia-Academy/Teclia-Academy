@@ -1,29 +1,22 @@
 import express from 'express';
-import { verifyToken } from '../middleware/auth.js';
+import { verifyToken, adminOnly } from '../middleware/auth.js';
 import validate from '../middleware/validate.js';
 import * as paymentSchemas from '../schemas/payment.schema.js';
-import { submitPaymentMethod, getPaymentStatus } from '../controllers/paymentController.js';
+import { getPaymentStatus } from '../controllers/paymentController.js';
 import { paymentLimiter } from '../middleware/rateLimiter.js';
-
-const router = express.Router();
-
-// All payment routes require auth + rate limiting
-router.post('/payment-method', paymentLimiter, verifyToken, validate(paymentSchemas.submitPaymentMethod), submitPaymentMethod);
-router.get('/:id', paymentLimiter, verifyToken, getPaymentStatus);
-import validate from '../middleware/validate.js';
-import * as paymentSchemas from '../schemas/payment.schema.js';
 import {
   createOrReusePayment,
   PaymentServiceError,
 } from '../services/paymentService.js';
 import { PaymentTransitionError } from '../services/paymentStateMachine.js';
 import { checkout, createPaymentIntent, confirmPaymentIntent } from '../controllers/paymentsController.js';
-import { verifyToken, adminOnly } from '../middleware/auth.js';
 import prisma from '../utils/prismaClient.js';
 import { evaluate, collectSignals, persistDecision, getMode, hashIp, getClientIp, httpStatusForDecision, withRiskLock } from '../services/riskEngine.js';
-import { createPaymentIntent as createPaymentIntentService } from '../services/paymentService.js';
 
 const router = express.Router();
+
+// Payment status lookup
+router.get('/:id', paymentLimiter, verifyToken, getPaymentStatus);
 
 async function riskGuard(req, { planTier, paymentMethodId, path }) {
   const ip = getClientIp(req);
