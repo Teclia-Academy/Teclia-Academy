@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
   "installCommand": "npm install && npm install --prefix Backend",
-  "buildCommand": "npm run build:vercel",
+  "buildCommand": "node scripts/vercel-baseline-build.mjs",
   "outputDirectory": "dist",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" },
