@@ -1,8 +1,22 @@
 import 'dotenv/config';
 
-if (process.env.TEST_DATABASE_URL) {
-  process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
+const testDatabaseUrl = process.env.TEST_DATABASE_URL?.trim();
+const applicationDatabaseUrl = process.env.DATABASE_URL?.trim();
+
+if (!testDatabaseUrl) {
+  throw new Error(
+    'TEST_DATABASE_URL is required for backend tests; refusing to use DATABASE_URL.'
+  );
 }
+
+if (applicationDatabaseUrl && applicationDatabaseUrl === testDatabaseUrl) {
+  throw new Error(
+    'TEST_DATABASE_URL must be separate from DATABASE_URL; refusing to run tests against the application database.'
+  );
+}
+
+process.env.NODE_ENV = 'test';
+process.env.DATABASE_URL = testDatabaseUrl;
 
 // Force Prisma to prefer WASM/test client engine during tests if supported.
 // Set multiple env vars to increase compatibility across Prisma runtime versions.

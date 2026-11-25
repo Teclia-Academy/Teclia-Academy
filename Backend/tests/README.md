@@ -6,9 +6,9 @@ Prereqs
 - From the repository root run `npm install` inside `Backend/` to install dev dependencies.
 
 Setup
-- Set `TEST_DATABASE_URL` in `Backend/.env` (recommended) or reuse `DATABASE_URL`.
-- Apply migrations before running tests: `npm run prisma:deploy`
-- Do NOT run tests against production databases.
+- Set `TEST_DATABASE_URL` in `Backend/.env`. It must point to a dedicated, disposable test database.
+- Never reuse `DATABASE_URL` or point `TEST_DATABASE_URL` at production; the test suite deletes data between tests.
+- Apply migrations to the test database before running tests: `npm run prisma:deploy` (the Prisma config prefers `TEST_DATABASE_URL` when it is set).
 
 Scripts
 - `npm run test` — run tests once
