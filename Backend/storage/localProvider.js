@@ -140,6 +140,10 @@ const localProvider = {
     return saveFileBuffer(file, normalizedDestination);
   },
 
+  async createResumableUploadUrl() {
+    throw new Error('Resumable uploads require Supabase Storage; configure Supabase and set LOCAL_UPLOADS=false');
+  },
+
   /**
    * Deletes a file from the local uploads directory.
    *
