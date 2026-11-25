@@ -3,8 +3,14 @@ import { PrismaClient } from '@prisma/client';
 const globalForPrisma = globalThis;
 
 const resolveDatabaseUrl = () => {
-  if (process.env.NODE_ENV === 'test' && process.env.TEST_DATABASE_URL) {
-    return process.env.TEST_DATABASE_URL;
+  if (process.env.NODE_ENV === 'test') {
+    const testDatabaseUrl = process.env.TEST_DATABASE_URL?.trim();
+    if (!testDatabaseUrl) {
+      throw new Error(
+        'TEST_DATABASE_URL is required in test mode; refusing to use DATABASE_URL.'
+      );
+    }
+    return testDatabaseUrl;
   }
   return process.env.DATABASE_URL;
 };
