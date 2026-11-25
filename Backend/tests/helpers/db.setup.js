@@ -76,12 +76,19 @@ export const setupTestDb = () => {
   beforeAll(async () => {
     process.env.NODE_ENV = 'test';
 
-    if (!process.env.TEST_DATABASE_URL && !process.env.DATABASE_URL) {
+    const testDatabaseUrl = process.env.TEST_DATABASE_URL?.trim();
+    if (!testDatabaseUrl) {
       throw new Error(
-        'Set TEST_DATABASE_URL (recommended) or DATABASE_URL before running backend tests.'
+        'Set TEST_DATABASE_URL to a dedicated test database before running backend tests; tests will not use DATABASE_URL.'
       );
     }
 
+    const applicationDatabaseUrl = process.env.DATABASE_URL?.trim();
+    if (applicationDatabaseUrl && applicationDatabaseUrl === testDatabaseUrl) {
+      throw new Error('TEST_DATABASE_URL must point to a dedicated database, not DATABASE_URL.');
+    }
+
+    process.env.DATABASE_URL = testDatabaseUrl;
     await connectDb();
     await ensurePaymentsTable();
     await ensureAuditTable();

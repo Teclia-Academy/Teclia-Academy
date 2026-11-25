@@ -52,6 +52,20 @@ const bodyOrDescription = z
     description: (value.body || value.description || '').trim(),
   }));
 
+const isAllowedContentUrl = (value) => {
+  if (value.startsWith('content/')) {
+    return value.split('/').slice(1).every(
+      (segment) => segment && segment !== '.' && segment !== '..' && /^[A-Za-z0-9._-]+$/.test(segment)
+    );
+  }
+
+  try {
+    return ['http:', 'https:'].includes(new URL(value).protocol);
+  } catch {
+    return false;
+  }
+};
+
 export const createContent = z.object({
   title: z
     .string()
@@ -63,9 +77,19 @@ export const createContent = z.object({
   plan_tier: contentPlanTier.optional(),
   ...bodyOrDescription.shape,
   tags: z.array(optionalTag).optional(),
-  url: z.string().url({ message: 'URL must be a valid URL' }).optional(),
+  url: z.string().min(1).max(2048).refine(isAllowedContentUrl, {
+    message: 'URL must be an HTTP(S) URL or a content storage path',
+  }).optional(),
   is_free: z.union([z.string(), z.number(), z.boolean()]).optional(),
-  plan_tier: z.string().optional(),
+});
+
+export const createContentUploadUrl = z.object({
+  filename: z.string().min(1).max(255),
+  contentType: z.string().min(1).max(255).refine(
+    (value) => /^(video|audio|image)\//i.test(value) || value === 'application/pdf' || value === 'application/octet-stream',
+    { message: 'Only video, audio, image, and PDF uploads are allowed' }
+  ),
+  uploadId: z.string().uuid().optional(),
 });
 
 export const updateContent = z

@@ -193,6 +193,16 @@ export const uploadContent = async (req, res) => {
   }
 };
 
+export const createContentUploadUrl = async (req, res) => {
+  try {
+    const { filename, contentType, uploadId } = req.body;
+    const upload = await storage.createResumableUploadUrl(filename, contentType, uploadId);
+    res.json(upload);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 const removeFileFromStorageOrLocal = async (fileUrl) => {
   if (!fileUrl) return;
 

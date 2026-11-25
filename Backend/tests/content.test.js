@@ -1,9 +1,11 @@
 import request from 'supertest';
 import app from '../app.js';
+import { jest } from '@jest/globals';
 import prisma from '../utils/prismaClient.js';
 import { setupTestDb, promoteUserToAdmin } from './helpers/db.setup.js';
 import { normalUser, adminUser } from './fixtures/users.js';
 import localProvider from '../storage/localProvider.js';
+import storage from '../storage/index.js';
 
 setupTestDb();
 
@@ -117,6 +119,58 @@ describe('Content endpoints', () => {
       .send({ title: 'Forbidden upload', type: 'article', description: 'Not allowed to upload' });
 
     expect(res.status).toBe(403);
+  });
+
+  it('Admin can request a scoped resumable upload URL', async () => {
+    const uploadId = 'c2cba8b5-360e-46bf-8f66-45a09f0c9912';
+    const createUploadUrl = jest.spyOn(storage, 'createResumableUploadUrl').mockResolvedValue({
+      bucket: 'uploads',
+      path: `content/${uploadId}.mp4`,
+      signature: 'mock-signature',
+      endpoint: 'https://project.storage.supabase.co/storage/v1/upload/resumable/sign',
+      apiKey: 'mock-anon-key',
+    });
+
+    try {
+      const res = await request(app)
+        .post('/api/content/upload-url')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ filename: 'lesson.mp4', contentType: 'video/mp4', uploadId });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({
+        bucket: 'uploads',
+        path: `content/${uploadId}.mp4`,
+        signature: 'mock-signature',
+      });
+    } finally {
+      createUploadUrl.mockRestore();
+    }
+  });
+
+  it('Admin can register content already uploaded directly to storage', async () => {
+    const res = await request(app)
+      .post('/api/content/upload')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        ...validContent,
+        title: 'Large video upload',
+        url: 'content/large-video.mp4',
+        plan_tier: 'free',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.content.url).toBe('/api/media/public?path=content%2Flarge-video.mp4');
+  });
+
+  it('Rejects resumable upload URLs for unsupported file types', async () => {
+    const res = await request(app)
+      .post('/api/content/upload-url')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ filename: 'script.js', contentType: 'application/javascript' });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toHaveProperty('error', 'Validation failed');
   });
 
   it('GET /api/content/:id returns 404 for missing id', async () => {

@@ -3,6 +3,7 @@
  *
  * Each provider must implement:
  * - upload(file, destination): stores a file and returns a persisted relative path.
+ * - createResumableUploadUrl(filename, contentType, uploadId): authorizes a direct large-file upload.
  * - delete(path): removes a previously stored file.
  * - resolveUrl(path): converts a stored path into a URL that the client can use.
  * - resolveSignedUrl(path, options): creates a short-lived URL for protected content.
